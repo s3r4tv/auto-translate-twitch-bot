@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twitch Translate Bot</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Главная страница -->
+        <div id="main-page" class="page active">
+            <div class="header">
+                <div class="logo">
+                    <i class="fas fa-gamepad"></i>
+                    <h1>Twitch Translate Bot</h1>
+                </div>
+                <div class="status-indicator" id="status-indicator">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Не запущен</span>
+                </div>
+            </div>
+
+            <div class="content">
+                <div class="control-panel">
+                    <div class="control-buttons">
+                        <button id="start-bot" class="btn btn-primary">
+                            <i class="fas fa-play"></i>
+                            Запустить бота
+                        </button>
+                        <button id="stop-bot" class="btn btn-danger" disabled>
+                            <i class="fas fa-stop"></i>
+                            Остановить бота
+                        </button>
+                                                            <button id="settings-btn" class="btn btn-secondary">
+                                        <i class="fas fa-cog"></i>
+                                        Настройки
+                                    </button>
+                                    <button id="about-btn" class="btn btn-secondary">
+                                        <i class="fas fa-user"></i>
+                                        Об авторе
+                                    </button>
+                    </div>
+                </div>
+
+                <div class="log-container">
+                    <div class="log-header">
+                        <h3><i class="fas fa-terminal"></i> Лог бота</h3>
+                        <button id="clear-log" class="btn btn-small">
+                            <i class="fas fa-trash"></i>
+                            Очистить
+                        </button>
+                    </div>
+                    <div id="log-content" class="log-content"></div>
+                </div>
+
+                <div class="info-panel">
+                    <div class="info-card">
+                        <h4><i class="fas fa-info-circle"></i> Команды бота</h4>
+                        <ul>
+                            <li><code class="copy-command" data-copy="!ru ">!ru &lt;текст&gt;</code> - перевод на русский</li>
+                            <li><code class="copy-command" data-copy="!en ">!en &lt;текст&gt;</code> - перевод на английский</li>
+                            <li><code class="copy-command" data-copy="!auto ">!auto @user on/off</code> - авто-перевод для пользователя</li>
+
+                            <li><code class="copy-command" data-copy="!tstatus">!tstatus</code> - статус бота</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="info-card">
+                        <h4><i class="fas fa-chart-bar"></i> Статус бота</h4>
+                        <div id="bot-status">
+                            <div class="status-item">
+                                <span class="status-label">Состояние:</span>
+                                <span id="bot-state" class="status-value">Остановлен</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Пользователей в автопереводе:</span>
+                                <span id="auto-users-count" class="status-value">0</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Переводов в кэше:</span>
+                                <span id="cache-size" class="status-value">0</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Пользователи в автопереводе:</span>
+                                <span id="auto-users-list" class="status-value">Нет</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Активных операций:</span>
+                                <span id="active-operations" class="status-value">0</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Ошибок за сессию:</span>
+                                <span id="error-count" class="status-value">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Страница настроек -->
+        <div id="settings-page" class="page">
+            <div class="header">
+                <button id="back-btn" class="btn btn-back">
+                    <i class="fas fa-arrow-left"></i>
+                    Назад
+                </button>
+                <h1>Настройки</h1>
+            </div>
+
+            <div class="content">
+                <div class="settings-container">
+                    <div class="settings-card">
+                        <h3><i class="fas fa-key"></i> Данные авторизации</h3>
+                        
+                        <div class="form-group">
+                            <label for="access-token">Access Token</label>
+                            <input type="password" id="access-token" placeholder="Введите Access Token">
+                            <small>Получите на сайте генератора токенов Twitch</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="client-id">Client ID</label>
+                            <input type="text" id="client-id" placeholder="Введите Client ID">
+                            <small>ID вашего приложения в Twitch Developer Console</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="nickname">Nickname бота</label>
+                            <input type="text" id="nickname" placeholder="Введите никнейм бота">
+                            <small>Никнейм бота в Twitch</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="channel">Канал</label>
+                            <input type="text" id="channel" placeholder="Введите название канала">
+                            <small>Название канала, где будет работать бот</small>
+                        </div>
+
+                        <div class="form-actions">
+                            <button id="save-settings" class="btn btn-primary">
+                                <i class="fas fa-save"></i>
+                                Сохранить настройки
+                            </button>
+                        </div>
+                    </div>
+
+                                         <div class="help-card">
+                         <h4><i class="fas fa-question-circle"></i> Как настроить бота</h4>
+                         <ol>
+                             <li>Создайте аккаунт бота на <a href="https://www.twitch.tv/playwithserch" target="_blank" class="link">Twitch</a></li>
+                             <li>Получите токены на сайте <a href="https://twitchtokengenerator.com/" target="_blank" class="link">генератора токенов</a></li>
+                             <li>Назначьте боту права модератора через <code class="copy-command" data-copy="/mod ">/mod @nickname</code></li>
+                             <li>Введите данные в форму слева и нажмите "Сохранить настройки"</li>
+                         </ol>
+                         <div class="alert alert-info">
+                             <i class="fas fa-info-circle"></i>
+                             <strong>Важно:</strong> Бот должен быть модератором канала для работы всех команд
+                         </div>
+                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+                    <!-- Модальное окно "Об авторе" -->
+                <div id="about-modal" class="modal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2><i class="fas fa-user-circle"></i> Об авторе</h2>
+                            <button id="close-about-modal" class="modal-close">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="about-info">
+                                <div class="author-section">
+                                    <h3><i class="fas fa-code"></i> Автор программы</h3>
+                                    <p class="author-name">PlayWithSERCH</p>
+                                </div>
+                                
+                                <div class="links-section">
+                                    <div class="link-item">
+                                        <i class="fab fa-twitch"></i>
+                                        <a href="https://www.twitch.tv/playwithserch" target="_blank" class="about-link">
+                                            Twitch
+                                        </a>
+                                    </div>
+                                    
+                                    <div class="link-item">
+                                        <i class="fas fa-globe"></i>
+                                        <a href="http://s3r4.tv/x" target="_blank" class="about-link">
+                                            Подробнее об авторе
+                                        </a>
+                                    </div>
+                                </div>
+                                
+                                <div class="version-section">
+                                    <h3><i class="fas fa-info-circle"></i> Информация</h3>
+                                    <p class="version-text">Версия программы: <span class="version-number">1.0</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script src="renderer.js"></script>
+            </body>
+            </html>
