@@ -486,6 +486,11 @@ class TwitchBotApp {
     }
 
     async checkForUpdates() {
+        // Система обновлений отключена для приватного репозитория
+        // Если нужно включить, раскомментируйте код ниже и сделайте репозиторий публичным
+        return;
+        
+        /*
         try {
             // Проверяем последний релиз на GitHub
             const response = await fetch('https://api.github.com/repos/s3r4tv/auto-translate-twitch-bot/releases/latest');
@@ -508,6 +513,7 @@ class TwitchBotApp {
             console.error('Ошибка при проверке обновлений:', error);
             // Не показываем ошибку пользователю, чтобы не засорять интерфейс
         }
+        */
     }
 
     compareVersions(version1, version2) {
