@@ -17,9 +17,15 @@
                     <i class="fas fa-gamepad"></i>
                     <h1>Twitch Translate Bot</h1>
                 </div>
-                <div class="status-indicator" id="status-indicator">
-                    <span class="status-dot"></span>
-                    <span class="status-text">Не запущен</span>
+                <div class="header-right">
+                    <div class="status-indicator" id="status-indicator">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Не запущен</span>
+                    </div>
+                    <button class="update-button" id="updateButton" style="display: none;">
+                        <i class="fas fa-download"></i>
+                        Загрузить обновление
+                    </button>
                 </div>
             </div>
 
@@ -62,8 +68,8 @@
                         <ul>
                             <li><code class="copy-command" data-copy="!ru ">!ru &lt;текст&gt;</code> - перевод на русский</li>
                             <li><code class="copy-command" data-copy="!en ">!en &lt;текст&gt;</code> - перевод на английский</li>
+                            <li><code class="copy-command" data-copy="!es ">!es &lt;текст&gt;</code> - перевод на испанский</li>
                             <li><code class="copy-command" data-copy="!auto ">!auto @user on/off</code> - авто-перевод для пользователя</li>
-
                             <li><code class="copy-command" data-copy="!tstatus">!tstatus</code> - статус бота</li>
                         </ul>
                     </div>
@@ -200,9 +206,112 @@
                                 
                                 <div class="version-section">
                                     <h3><i class="fas fa-info-circle"></i> Информация</h3>
-                                    <p class="version-text">Версия программы: <span class="version-number">1.0</span></p>
+                                    <p class="version-text">Версия программы: <span class="version-number">1.0.1</span></p>
+                                    <p class="library-text">
+                                        Библиотека перевода: <br>
+                                        <span class="library-name">google-translate-api-x v10.7.0</span>
+                                    </p>
+                                    <button id="version-log-btn" class="btn btn-small">
+                                        <i class="fas fa-history"></i>
+                                        Лог версий
+                                    </button>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Модальное окно "Лог версий" -->
+                <div id="version-log-modal" class="modal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2><i class="fas fa-history"></i> Лог версий</h2>
+                            <button id="close-version-log-modal" class="modal-close">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="version-log-content">
+                                <div class="version-entry current">
+                                    <h3><i class="fas fa-star"></i> Версия 1.0.1 (Текущая)</h3>
+                                    <p class="version-date">Дата релиза: Сентябрь 2025</p>
+                                    <div class="version-changes">
+                                        <h4>Новые возможности:</h4>
+                                        <ul>
+                                            <li>✅ Поддержка испанского языка</li>
+                                            <li>✅ Команда !es для перевода на испанский</li>
+                                            <li>✅ Автоматическое определение испанского</li>
+                                            <li>✅ Автоперевод испанских сообщений</li>
+                                            <li>✅ Улучшенная постобработка переводов</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                
+                                <div class="version-entry">
+                                    <h3><i class="fas fa-code"></i> Версия 1.0</h3>
+                                    <p class="version-date">Дата релиза: Сентябрь 2025</p>
+                                    <div class="version-changes">
+                                        <h4>Основные изменения:</h4>
+                                        <ul>
+                                            <li>✅ Полный переход на Electron приложение</li>
+                                            <li>✅ Современный геймерский интерфейс</li>
+                                            <li>✅ Продвинутый переводчик с кэшированием</li>
+                                            <li>✅ Автоматическое определение языка</li>
+                                            <li>✅ Умная логика автоперевода (50%+ правило)</li>
+                                            <li>✅ Команды: !ru, !en, !es, !auto, !tstatus</li>
+                                            <li>✅ Система уведомлений в чате</li>
+                                            <li>✅ Обработка ошибок и переподключение</li>
+                                            <li>✅ Кроссплатформенная сборка</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                
+                                <div class="version-entry">
+                                    <h3><i class="fas fa-code"></i> Версия 0.9 (Бета)</h3>
+                                    <p class="version-date">Дата релиза: Август 2025</p>
+                                    <div class="version-changes">
+                                        <h4>Изменения:</h4>
+                                        <ul>
+                                            <li>🔧 Первая версия на Python + Tkinter</li>
+                                            <li>🔧 Базовая функциональность перевода</li>
+                                            <li>🔧 Простой интерфейс настроек</li>
+                                            <li>🔧 Поддержка команд !ru и !en</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Модальное окно подтверждения выхода -->
+                <div id="exit-confirm-modal" class="modal">
+                    <div class="modal-content exit-confirm-modal">
+                        <div class="modal-header">
+                            <h2><i class="fas fa-question-circle"></i> Подтверждение выхода</h2>
+                        </div>
+                        <div class="modal-body">
+                            <div class="exit-confirm-content">
+                                <p class="exit-message">Уверены ли вы, что хотите выйти из программы?</p>
+                                <div class="exit-detail">
+                                    <div class="exit-option">
+                                        <strong>ДА</strong> - полностью закрыть программу
+                                    </div>
+                                    <div class="exit-option">
+                                        <strong>НЕТ</strong> - отменить выход
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button id="exit-confirm-yes" class="btn btn-danger">
+                                <i class="fas fa-power-off"></i>
+                                ДА - Выйти
+                            </button>
+                            <button id="exit-confirm-no" class="btn btn-secondary">
+                                <i class="fas fa-times"></i>
+                                НЕТ - Отмена
+                            </button>
                         </div>
                     </div>
                 </div>

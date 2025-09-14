@@ -1,11 +1,11 @@
 {
   "name": "twitch-translate-bot",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Twitch Translate Bot - Desktop Application",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --dev",
+    "dev": "cross-env NODE_ENV=development electron .",
     "build": "electron-builder",
     "dist": "electron-builder --publish=never",
     "clean": "rimraf dist node_modules package-lock.json",
@@ -24,12 +24,14 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "^28.0.0",
-    "electron-builder": "^24.6.4"
+    "electron-builder": "^24.6.4",
+    "rimraf": "^6.0.1",
+    "cross-env": "^7.0.3"
   },
   "dependencies": {
-    "tmi.js": "^1.8.5",
+    "dotenv": "^16.3.1",
     "google-translate-api-x": "^10.7.0",
-    "dotenv": "^16.3.1"
+    "tmi.js": "^1.8.5"
   },
   "build": {
     "appId": "com.twitchtranslatebot.app",
@@ -37,20 +39,37 @@
     "directories": {
       "output": "dist"
     },
-    "files": [
-      "**/*",
-      "!node_modules/**/*",
-      "!dist/**/*",
-      "!*.log"
-    ],
+      "files": [
+        "**/*",
+        "!node_modules/@types/**/*",
+        "!node_modules/*/test/**/*",
+        "!node_modules/*/tests/**/*",
+        "!node_modules/*/*.md",
+        "!dist/**/*",
+        "!*.log",
+        "!.env",
+        "!logs/**/*",
+        "!auto_translate_settings.json",
+        "!*.md",
+        "!.gitignore"
+      ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "logo_translate.png",
+      "extraResources": [
+        {
+          "from": "node_modules",
+          "to": "node_modules"
+        }
+      ]
     },
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "icon": "logo_translate.png"
     },
     "linux": {
-      "target": "AppImage"
+      "target": "AppImage",
+      "icon": "logo_translate.png"
     }
   }
 }

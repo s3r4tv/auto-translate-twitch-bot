@@ -1,5 +1,6 @@
 const translate = require('google-translate-api-x');
 const EventEmitter = require('events');
+const path = require('path');
 
 class AdvancedTranslationService extends EventEmitter {
     constructor() {
@@ -63,6 +64,10 @@ class AdvancedTranslationService extends EventEmitter {
             // Make English translation more informal for chat
             processed = processed.replace(/^Hello, /, 'Hey, ');
             processed = processed.replace(/^Good morning, /, 'Hey, ');
+        } else if (targetLang === 'es') {
+            // Make Spanish translation more informal for chat
+            processed = processed.replace(/^Hola, /, '¡Hola, ');
+            processed = processed.replace(/^Buenos días, /, '¡Hola, ');
         }
         
         return processed;
@@ -73,14 +78,17 @@ class AdvancedTranslationService extends EventEmitter {
         
         const latinChars = (text.match(/[a-zA-Z]/g) || []).length;
         const cyrillicChars = (text.match(/[а-яё]/gi) || []).length;
+        const spanishChars = (text.match(/[ñáéíóúü¿¡]/gi) || []).length;
         const totalChars = latinChars + cyrillicChars;
         
         if (totalChars === 0) return null;
         
         const latinPercent = (latinChars / totalChars) * 100;
         const cyrillicPercent = (cyrillicChars / totalChars) * 100;
+        const spanishPercent = (spanishChars / totalChars) * 100;
         
         if (cyrillicPercent > 50) return 'ru';
+        if (spanishPercent > 10) return 'es'; // Испанский если есть испанские символы
         if (latinPercent > 50) return 'en';
         
         return null; // Mixed language
@@ -92,6 +100,10 @@ class AdvancedTranslationService extends EventEmitter {
 
     async translateToEnglish(text) {
         return this.translate(text, 'ru', 'en');
+    }
+
+    async translateToSpanish(text) {
+        return this.translate(text, 'en', 'es');
     }
 
     async translate(text, sourceLang, targetLang) {

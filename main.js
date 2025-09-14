@@ -1,11 +1,25 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+
 const { TranslateBot } = require('./src/bot/twitch_bot.js');
 
 let mainWindow;
 let bot = null;
 let botRunning = false;
+
+// Функция для получения пути к файлу настроек
+function getSettingsPath() {
+  // В режиме разработки используем папку проекта
+  if (process.env.NODE_ENV === 'development') {
+    return path.join(__dirname, '.env');
+  }
+  
+  // В собранном приложении используем папку пользователя
+  const userDataPath = app.getPath('userData');
+  return path.join(userDataPath, 'settings.env');
+}
 
 function createWindow() {
   try {
@@ -19,7 +33,7 @@ function createWindow() {
         contextIsolation: false,
         enableRemoteModule: true
       },
-      // icon: path.join(__dirname, 'assets/icon.png'),
+      icon: path.join(__dirname, 'logo_mini.png'),
       titleBarStyle: 'default',
       show: false,
       backgroundColor: '#1a1a1a'
@@ -34,6 +48,44 @@ function createWindow() {
       mainWindow.show();
     });
 
+    // Обработка закрытия окна
+    mainWindow.on('close', (event) => {
+      event.preventDefault();
+      
+      // Показываем кастомный диалог в renderer процессе
+      mainWindow.webContents.send('show-exit-dialog');
+    });
+
+    // Обработчики IPC для выхода и минимизации
+    ipcMain.on('app-exit', async () => {
+      try {
+        if (bot && botRunning) {
+          console.log('Останавливаем бота перед выходом...');
+          mainWindow.webContents.send('bot-log', '⏳ Остановка бота перед выходом...');
+          
+          await bot.stop();
+          
+          console.log('Бот успешно остановлен');
+          mainWindow.webContents.send('bot-log', '✅ Бот успешно остановлен');
+          
+          // Небольшая задержка для завершения всех операций
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        console.log('Закрываем приложение...');
+        mainWindow.removeAllListeners('close');
+        mainWindow.close();
+        app.quit();
+      } catch (error) {
+        console.error('Error on app exit:', error);
+        // Даже если есть ошибка, все равно закрываем приложение
+        mainWindow.removeAllListeners('close');
+        mainWindow.close();
+        app.quit();
+      }
+    });
+
+
     mainWindow.on('closed', () => {
       mainWindow = null;
     });
@@ -47,6 +99,33 @@ function createWindow() {
     app.quit();
   }
 }
+
+// Обработка завершения процесса
+process.on('SIGINT', async () => {
+  console.log('Получен сигнал SIGINT, останавливаем бота...');
+  if (bot && botRunning) {
+    try {
+      await bot.stop();
+      console.log('Бот остановлен');
+    } catch (error) {
+      console.error('Ошибка при остановке бота:', error);
+    }
+  }
+  app.quit();
+});
+
+process.on('SIGTERM', async () => {
+  console.log('Получен сигнал SIGTERM, останавливаем бота...');
+  if (bot && botRunning) {
+    try {
+      await bot.stop();
+      console.log('Бот остановлен');
+    } catch (error) {
+      console.error('Ошибка при остановке бота:', error);
+    }
+  }
+  app.quit();
+});
 
 app.whenReady().then(createWindow);
 
@@ -65,7 +144,7 @@ app.on('activate', () => {
 // IPC Handlers
 ipcMain.handle('check-settings', async () => {
   try {
-    const envPath = path.join(__dirname, '.env');
+    const envPath = getSettingsPath();
     if (!fs.existsSync(envPath)) {
       return { exists: false, missing: ['TWITCH_ACCESS_TOKEN', 'TWITCH_CLIENT_ID', 'TWITCH_NICKNAME', 'TWITCH_CHANNEL'] };
     }
@@ -115,7 +194,14 @@ TWITCH_CLIENT_ID=${settings.clientId}
 TWITCH_NICKNAME=${settings.nickname}
 TWITCH_CHANNEL=${settings.channel}`;
 
-    const envPath = path.join(__dirname, '.env');
+    const envPath = getSettingsPath();
+    
+    // Убеждаемся, что папка существует
+    const settingsDir = path.dirname(envPath);
+    if (!fs.existsSync(settingsDir)) {
+      fs.mkdirSync(settingsDir, { recursive: true });
+    }
+    
     fs.writeFileSync(envPath, envContent);
     return { success: true };
   } catch (error) {
@@ -126,7 +212,7 @@ TWITCH_CHANNEL=${settings.channel}`;
 
 ipcMain.handle('load-settings', async () => {
   try {
-    const envPath = path.join(__dirname, '.env');
+    const envPath = getSettingsPath();
     if (!fs.existsSync(envPath)) {
       return { success: false, error: 'Settings file not found' };
     }
@@ -174,7 +260,7 @@ ipcMain.handle('start-bot', async (event) => {
   }
 
   try {
-    const envPath = path.join(__dirname, '.env');
+    const envPath = getSettingsPath();
     if (!fs.existsSync(envPath)) {
       return { success: false, error: 'Settings not found. Please configure the bot first.' };
     }

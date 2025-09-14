@@ -12,6 +12,9 @@ class TwitchBotApp {
         this.checkSettings();
         this.updateBotStatus();
         
+        // Проверка обновлений при запуске
+        this.checkForUpdates();
+        
         // Периодическое обновление статуса каждые 2 секунды
         this.statusUpdateInterval = setInterval(() => {
             this.updateBotStatus();
@@ -44,10 +47,33 @@ class TwitchBotApp {
         document.getElementById('about-btn').addEventListener('click', () => this.showAboutModal());
         document.getElementById('close-about-modal').addEventListener('click', () => this.hideAboutModal());
         
+        // Version log modal
+        document.getElementById('version-log-btn').addEventListener('click', () => this.showVersionLogModal());
+        document.getElementById('close-version-log-modal').addEventListener('click', () => this.hideVersionLogModal());
+        
+        // Update button
+        document.getElementById('updateButton').addEventListener('click', () => this.downloadUpdate());
+        
         // Close modal when clicking outside
         document.getElementById('about-modal').addEventListener('click', (e) => {
             if (e.target.id === 'about-modal') {
                 this.hideAboutModal();
+            }
+        });
+        
+        document.getElementById('version-log-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'version-log-modal') {
+                this.hideVersionLogModal();
+            }
+        });
+
+        // Exit confirmation modal
+        document.getElementById('exit-confirm-yes').addEventListener('click', () => this.confirmExit(true));
+        document.getElementById('exit-confirm-no').addEventListener('click', () => this.confirmExit(false));
+        
+        document.getElementById('exit-confirm-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'exit-confirm-modal') {
+                this.hideExitConfirmModal();
             }
         });
 
@@ -81,11 +107,18 @@ class TwitchBotApp {
             this.addLogEntry('🛑 Бот остановлен', 'warning');
             this.updateStatusIndicator('stopped');
         });
+
+        // Exit dialog event
+        ipcRenderer.on('show-exit-dialog', () => {
+            this.showExitConfirmModal();
+        });
         
         // Handle Escape key for modal
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 this.hideAboutModal();
+                this.hideVersionLogModal();
+                this.hideExitConfirmModal();
             }
         });
     }
@@ -255,13 +288,28 @@ class TwitchBotApp {
         logEntry.className = `log-entry ${type}`;
         logEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
         
+        // Добавляем сообщение
         logContent.appendChild(logEntry);
-        logContent.scrollTop = logContent.scrollHeight;
+        
+        // Принудительная прокрутка вниз с небольшой задержкой
+        setTimeout(() => {
+            try {
+                logContent.scrollTop = logContent.scrollHeight;
+            } catch (e) {
+                console.warn('Ошибка прокрутки лога:', e);
+            }
+        }, 10);
 
-        // Limit log entries to prevent memory issues
+        // Ограничиваем количество сообщений для производительности
         const entries = logContent.querySelectorAll('.log-entry');
-        if (entries.length > 1000) {
-            entries[0].remove();
+        if (entries.length > 200) {
+            // Удаляем старые сообщения, оставляя последние 200
+            const toRemove = entries.length - 200;
+            for (let i = 0; i < toRemove; i++) {
+                if (entries[i]) {
+                    entries[i].remove();
+                }
+            }
         }
     }
 
@@ -423,6 +471,92 @@ class TwitchBotApp {
         const modal = document.getElementById('about-modal');
         modal.style.display = 'none';
         document.body.style.overflow = 'auto'; // Restore scrolling
+    }
+
+    showVersionLogModal() {
+        const modal = document.getElementById('version-log-modal');
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    }
+
+    hideVersionLogModal() {
+        const modal = document.getElementById('version-log-modal');
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto'; // Restore scrolling
+    }
+
+    async checkForUpdates() {
+        try {
+            // Проверяем последний релиз на GitHub
+            const response = await fetch('https://api.github.com/repos/s3r4tv/auto-translate-twitch-bot/releases/latest');
+            if (!response.ok) throw new Error('Не удалось проверить обновления');
+            
+            const release = await response.json();
+            const currentVersion = '1.0.1';
+            const latestVersion = release.tag_name.replace('v', '');
+            
+            if (this.compareVersions(latestVersion, currentVersion) > 0) {
+                // Доступно обновление
+                const updateButton = document.getElementById('updateButton');
+                updateButton.style.display = 'flex';
+                updateButton.setAttribute('data-download-url', release.assets[0]?.browser_download_url || '');
+                updateButton.setAttribute('data-version', latestVersion);
+                
+                this.addLogMessage(`Доступно обновление: версия ${latestVersion}`, 'info');
+            }
+        } catch (error) {
+            console.error('Ошибка при проверке обновлений:', error);
+            // Не показываем ошибку пользователю, чтобы не засорять интерфейс
+        }
+    }
+
+    compareVersions(version1, version2) {
+        const v1parts = version1.split('.').map(Number);
+        const v2parts = version2.split('.').map(Number);
+        
+        for (let i = 0; i < Math.max(v1parts.length, v2parts.length); i++) {
+            const v1part = v1parts[i] || 0;
+            const v2part = v2parts[i] || 0;
+            
+            if (v1part > v2part) return 1;
+            if (v1part < v2part) return -1;
+        }
+        
+        return 0;
+    }
+
+    downloadUpdate() {
+        const updateButton = document.getElementById('updateButton');
+        const downloadUrl = updateButton.getAttribute('data-download-url');
+        const version = updateButton.getAttribute('data-version');
+        
+        if (downloadUrl) {
+            // Открываем ссылку на скачивание в браузере
+            require('electron').shell.openExternal(downloadUrl);
+            this.addLogMessage(`Запуск загрузки обновления версии ${version}`, 'success');
+        }
+    }
+
+    showExitConfirmModal() {
+        const modal = document.getElementById('exit-confirm-modal');
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+
+    hideExitConfirmModal() {
+        const modal = document.getElementById('exit-confirm-modal');
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+
+    async confirmExit(shouldExit) {
+        this.hideExitConfirmModal();
+        
+        if (shouldExit) {
+            // Отправляем сообщение в main процесс для выхода
+            require('electron').ipcRenderer.send('app-exit');
+        }
+        // Если shouldExit = false, просто закрываем диалог и ничего не делаем
     }
 }
 

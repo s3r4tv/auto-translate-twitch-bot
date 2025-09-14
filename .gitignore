@@ -51,3 +51,6 @@ Thumbs.db
 
 # Кэш переводов (если будет сохранен в файл)
 translation_cache.json
+
+# Настройки автоперевода пользователей
+auto_translate_settings.json

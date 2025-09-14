@@ -1,6 +1,8 @@
 const tmi = require('tmi.js');
 const { AdvancedTranslationService } = require('./translator_advanced.js');
 const EventEmitter = require('events');
+const fs = require('fs');
+const path = require('path');
 
 class TranslateBot extends EventEmitter {
     constructor(accessToken, clientId, nickname, channel) {
@@ -32,6 +34,9 @@ class TranslateBot extends EventEmitter {
         this.activeOperations = new Map();
         this.operationQueue = [];
         this.maxConcurrentOperations = 5;
+        
+        // Загружаем сохраненные настройки автоперевода
+        this.loadAutoTranslateSettings();
         
         this.log('Бот инициализирован для канала: ' + channel);
     }
@@ -226,15 +231,17 @@ class TranslateBot extends EventEmitter {
         
         const latinChars = (content.match(/[a-zA-Z]/g) || []).length;
         const cyrillicChars = (content.match(/[а-яё]/gi) || []).length;
+        const spanishChars = (content.match(/[ñáéíóúü¿¡]/gi) || []).length;
         const totalChars = latinChars + cyrillicChars;
         
         if (totalChars === 0) return false;
         
         const latinPercent = (latinChars / totalChars) * 100;
         const cyrillicPercent = (cyrillicChars / totalChars) * 100;
+        const spanishPercent = (spanishChars / totalChars) * 100;
         
         // Translate only if one language is > 50% and the other is < 50%
-        return (latinPercent > 50 && cyrillicPercent < 50) || (cyrillicPercent > 50 && latinPercent < 50);
+        return (latinPercent > 50 && cyrillicPercent < 50) || (cyrillicPercent > 50 && latinPercent < 50) || (spanishPercent > 10);
     }
     
     detectLanguage(text) {
@@ -242,14 +249,17 @@ class TranslateBot extends EventEmitter {
         
         const latinChars = (text.match(/[a-zA-Z]/g) || []).length;
         const cyrillicChars = (text.match(/[а-яё]/gi) || []).length;
+        const spanishChars = (text.match(/[ñáéíóúü¿¡]/gi) || []).length;
         const totalChars = latinChars + cyrillicChars;
         
         if (totalChars === 0) return null;
         
         const latinPercent = (latinChars / totalChars) * 100;
         const cyrillicPercent = (cyrillicChars / totalChars) * 100;
+        const spanishPercent = (spanishChars / totalChars) * 100;
         
         if (cyrillicPercent > 50) return 'ru';
+        if (spanishPercent > 10) return 'es'; // Испанский если есть испанские символы
         if (latinPercent > 50) return 'en';
         
         return null; // Mixed language
@@ -279,13 +289,15 @@ class TranslateBot extends EventEmitter {
             
             const latinChars = (content.match(/[a-zA-Z]/g) || []).length;
             const cyrillicChars = (content.match(/[а-яё]/gi) || []).length;
+            const spanishChars = (content.match(/[ñáéíóúü¿¡]/gi) || []).length;
             const totalChars = latinChars + cyrillicChars;
             
             if (totalChars > 0) {
                 const latinPercent = (latinChars / totalChars) * 100;
                 const cyrillicPercent = (cyrillicChars / totalChars) * 100;
+                const spanishPercent = (spanishChars / totalChars) * 100;
                 
-                this.log(`🔍 Анализ языка для '${content}': латиница ${latinPercent.toFixed(1)}%, кириллица ${cyrillicPercent.toFixed(1)}%`);
+                this.log(`🔍 Анализ языка для '${content}': латиница ${latinPercent.toFixed(1)}%, кириллица ${cyrillicPercent.toFixed(1)}%, испанский ${spanishPercent.toFixed(1)}%`);
                 
                 if (userInAutoList) {
                     // For users in auto-translate list - translate to opposite language
@@ -299,7 +311,7 @@ class TranslateBot extends EventEmitter {
                             await this.sendMessage(`@${message.author.username} write: ${translatedText}`);
                             this.log(`🔄 Авто-перевод для ${message.author.username} на ${targetLang}: ${content} -> ${translatedText}`);
                         }
-                    } else if (latinPercent > 50 && cyrillicPercent < 50) {
+                    } else if (latinPercent > 50 && cyrillicPercent < 50 && spanishPercent < 10) {
                         // English predominates - translate to Russian
                         const translatedText = await this.translator.translateToRussian(content);
                         const targetLang = "русский";
@@ -307,6 +319,16 @@ class TranslateBot extends EventEmitter {
                         
                         if (translatedText && translatedText !== content) {
                             await this.sendMessage(`@${message.author.username} пишет: ${translatedText}`);
+                            this.log(`🔄 Авто-перевод для ${message.author.username} на ${targetLang}: ${content} -> ${translatedText}`);
+                        }
+                    } else if (spanishPercent > 10) {
+                        // Spanish predominates - translate to English
+                        const translatedText = await this.translator.translateToEnglish(content);
+                        const targetLang = "английский";
+                        this.log(`🔄 Автоперевод для ${message.author.username}: испанский -> английский`);
+                        
+                        if (translatedText && translatedText !== content) {
+                            await this.sendMessage(`@${message.author.username} write: ${translatedText}`);
                             this.log(`🔄 Авто-перевод для ${message.author.username} на ${targetLang}: ${content} -> ${translatedText}`);
                         }
                     } else {
@@ -342,6 +364,15 @@ class TranslateBot extends EventEmitter {
                 await this.sendMessage(`@${author} ❌ Укажите текст для перевода! Использование: !en <текст>`);
             }
         }
+        // !es command
+        else if (content.startsWith('!es ')) {
+            const text = message.content.substring(4).trim();
+            if (text) {
+                await this.handleTranslateCommand(message, text, 'es');
+            } else {
+                await this.sendMessage(`@${author} ❌ Укажите текст для перевода! Использование: !es <текст>`);
+            }
+        }
         // !auto command
         else if (content.startsWith('!auto ')) {
             await this.handleAutoCommand(message);
@@ -373,7 +404,12 @@ class TranslateBot extends EventEmitter {
         
         // Проверяем, не пытаемся ли перевести на тот же язык
         if (sourceLang === targetLang) {
-            await this.sendMessage(`@${author} ℹ️ Текст уже на ${targetLang === 'ru' ? 'русском' : 'английском'} языке.`);
+            const langNames = {
+                'ru': 'русском',
+                'en': 'английском',
+                'es': 'испанском'
+            };
+            await this.sendMessage(`@${author} ℹ️ Текст уже на ${langNames[targetLang] || targetLang} языке.`);
             this.log(`ℹ️ Попытка перевода на тот же язык для ${author}: ${text}`);
             return;
         }
@@ -398,8 +434,18 @@ class TranslateBot extends EventEmitter {
         }
         
         if (translatedText) {
-            const langName = targetLang === 'ru' ? "русский" : "английский";
-            const writeText = targetLang === 'ru' ? "пишет" : "write";
+            const langNames = {
+                'ru': "русский",
+                'en': "английский", 
+                'es': "испанский"
+            };
+            const writeTexts = {
+                'ru': "пишет",
+                'en': "write",
+                'es': "escribe"
+            };
+            const langName = langNames[targetLang] || targetLang;
+            const writeText = writeTexts[targetLang] || "write";
             await this.sendMessage(`@${author} ${writeText}: ${translatedText}`);
             this.log(`✅ Перевод выполнен для ${author} на ${langName}: ${text} -> ${translatedText}`);
         } else {
@@ -438,6 +484,7 @@ class TranslateBot extends EventEmitter {
             const usersCount = this.autoTranslateUsers.size;
             await this.sendMessage(`✅ @${author} Авто-перевод для @${targetUser} успешно включен! Всего пользователей в списке автоперевода: ${usersCount}`);
             this.log(`Авто-перевод включен для пользователя: ${targetUser} (команда от ${author})`);
+            this.saveAutoTranslateSettings();
         } else {
             if (!this.autoTranslateUsers.has(targetUser)) {
                 await this.sendMessage(`ℹ️ @${author} Авто-перевод для @${targetUser} уже отключен!`);
@@ -448,6 +495,7 @@ class TranslateBot extends EventEmitter {
             const usersCount = this.autoTranslateUsers.size;
             await this.sendMessage(`🔴 @${author} Авто-перевод для @${targetUser} успешно отключен. Осталось пользователей в списке автоперевода: ${usersCount}`);
             this.log(`Авто-перевод отключен для пользователя: ${targetUser} (команда от ${author})`);
+            this.saveAutoTranslateSettings();
         }
     }
 
@@ -495,7 +543,7 @@ class TranslateBot extends EventEmitter {
             this.client.on('connected', (addr, port) => {
                 this.log(`Бот ${this.nickname} подключен к Twitch!`);
                 this.log(`Присоединился к каналу: ${this.channel}`);
-                this.sendMessage('🤖 Бот авто-перевода сообщений готов к работе! Доступные команды: !ru <text>, !en <текст>, !auto @user on/off, !tstatus');
+                this.sendMessage('🤖 Бот авто-перевода сообщений готов к работе! Доступные команды: !ru <text>, !en <text>, !es <text>, !auto @user on/off, !tstatus');
             });
             
             this.client.on('message', async (channel, tags, message, self) => {
@@ -507,7 +555,8 @@ class TranslateBot extends EventEmitter {
                     return;
                 }
                 
-                this.log(`[${tags.username}]: ${message}`);
+                // Немедленно логируем входящее сообщение
+                this.log(`💬 ${tags.username}: ${message}`);
                 
                 // Create message object for compatibility
                 const messageObj = {
@@ -520,7 +569,10 @@ class TranslateBot extends EventEmitter {
                 };
                 
                 // Безопасная обработка сообщений с контролем concurrency
-                await this.handleMessageSafely(messageObj);
+                // Не ждем завершения обработки, чтобы не блокировать поток
+                this.handleMessageSafely(messageObj).catch(error => {
+                    this.log(`❌ Ошибка обработки сообщения от ${tags.username}: ${error.message}`, 'error');
+                });
             });
             
             this.client.on('disconnected', (reason) => {
@@ -569,6 +621,9 @@ class TranslateBot extends EventEmitter {
                 this.translator.stopCacheCleanup();
             }
             
+            // Сохраняем настройки автоперевода перед остановкой
+            this.saveAutoTranslateSettings();
+            
             this.log('Бот остановлен');
             
         } catch (error) {
@@ -590,6 +645,42 @@ class TranslateBot extends EventEmitter {
                 queued: operationStats.queued
             }
         };
+    }
+
+    getAutoTranslateSettingsPath() {
+        return path.join(__dirname, '..', '..', 'auto_translate_settings.json');
+    }
+
+    saveAutoTranslateSettings() {
+        try {
+            const settings = {
+                users: Array.from(this.autoTranslateUsers),
+                timestamp: Date.now()
+            };
+            
+            const settingsPath = this.getAutoTranslateSettingsPath();
+            fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+            this.log(`Настройки автоперевода сохранены: ${this.autoTranslateUsers.size} пользователей`);
+        } catch (error) {
+            this.log(`Ошибка сохранения настроек автоперевода: ${error.message}`, 'error');
+        }
+    }
+
+    loadAutoTranslateSettings() {
+        try {
+            const settingsPath = this.getAutoTranslateSettingsPath();
+            if (fs.existsSync(settingsPath)) {
+                const data = fs.readFileSync(settingsPath, 'utf8');
+                const settings = JSON.parse(data);
+                
+                if (settings.users && Array.isArray(settings.users)) {
+                    this.autoTranslateUsers = new Set(settings.users);
+                    this.log(`Загружены настройки автоперевода: ${this.autoTranslateUsers.size} пользователей`);
+                }
+            }
+        } catch (error) {
+            this.log(`Ошибка загрузки настроек автоперевода: ${error.message}`, 'error');
+        }
     }
 }
 
